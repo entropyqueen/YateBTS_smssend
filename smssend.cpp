@@ -136,7 +136,10 @@ namespace {
 						if (s >= 0) {
 							caller = tmp.substr(0, s);
 							// Sending text message
-							return SmsSendPlugin::sendSMS(msisdn, caller, tmp.substr(s + 1));
+							if (SmsSendPlugin::sendSMS(msisdn, caller, tmp.substr(s + 1)) == true) {
+								msg.retValue() << "message succesfuly sent.\r\n";
+								return true;
+							}
 						}
 					}
 				}
