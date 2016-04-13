@@ -140,6 +140,8 @@ namespace {
 								msg.retValue() << "message succesfuly sent.\r\n";
 								return true;
 							}
+							else
+								msg.retValue() << "failed to send message.\r\n";
 						}
 					}
 				}
