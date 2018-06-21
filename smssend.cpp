@@ -35,12 +35,13 @@
 #include <iterator>
 
 #include <yatephone.h>
-
+#include <bits/stdc++.h>
+using namespace std;
 using namespace TelEngine;
 namespace {
 
-	static const char s_mini[] = "smssend <MSISDN> <CALLER> <message>";
-	static const char s_help[] = "send text messages to a particular MS";
+	static const char s_mini[] = "smssend <MSISDN> <CALLER> <message> \nsmssend <MSISDN,MSISDN> <CALLER> <message>";
+	static const char s_help[] = "send text messages to a particular MSISDN(s)";
 
 	class CmdHandler : public MessageReceiver {
 		public:
@@ -50,6 +51,8 @@ namespace {
 				Help
 			};
 			virtual bool received(Message &msg, int id);
+			int countChars( char* s, char c );
+			char* ReadFile (char* filename);
 			bool doCommand(String& line, String& rval);
 			bool doComplete(const String& partLine, const String& partWord, String& rval);
 	};
@@ -94,6 +97,49 @@ namespace {
 		return true;
 	}
 
+	//method that counts # of [c] in [s]
+	int CmdHandler::countChars( char* s, char c ) {
+                return *s == '\0' ? 0 : countChars( s + 1, c ) + (*s == c);
+        }
+
+	char* CmdHandler::ReadFile(char *filename)
+	{
+   		char *buffer = NULL;
+   		int string_size, read_size;
+   		FILE *handler = fopen(filename, "r");
+   		if (handler)
+   		{
+       			// Seek the last byte of the file
+       			fseek(handler, 0, SEEK_END);
+       			// Offset from the first to the last byte, or in other words, filesize
+       			string_size = ftell(handler);
+       			// go back to the start of the file
+       			rewind(handler);
+
+		        // Allocate a string that can hold it all
+			buffer = (char*) malloc(sizeof(char) * (string_size + 1) );
+
+		       // Read it all in one operation
+		       read_size = fread(buffer, sizeof(char), string_size, handler);
+
+       			// fread doesn't set it so put a \0 in the last position
+       			// and buffer is now officially a string
+       			buffer[string_size] = '\0';
+
+       			if (string_size != read_size)
+       			{
+           			// Something went wrong, throw away the memory and set
+           			// the buffer to NULL
+           			free(buffer);
+           			buffer = NULL;
+       			}
+
+       			fclose(handler);
+    		}
+
+    		return buffer;
+	}
+
 	bool CmdHandler::doComplete(const String& partLine, const String& partWord, String& rval) {
 		// For autocompletion purpose.
 		return false;
@@ -116,7 +162,6 @@ namespace {
 
 	bool CmdHandler::received(Message &msg, int id) {
 		String tmp;
-
 		switch (id) {
 			case Status:
 				break;
@@ -128,24 +173,51 @@ namespace {
 					if (s >= 0)	{
 
 						String msisdn = tmp.substr(0, s);
-						String caller;
 
-						tmp.startSkip(msisdn);
-						tmp = tmp.trimBlanks();
-						s = tmp.find(' ');
-						if (s >= 0) {
-							caller = tmp.substr(0, s);
-							// Sending text message
-							if (SmsSendPlugin::sendSMS(msisdn, caller, tmp.substr(s + 1)) == true) {
-								msg.retValue() << "message succesfuly sent.\r\n";
-								return true;
+						// TODO check for "all" - to send to all registered MSISDNs
+						if (strcmp("all",msisdn) == 0)
+						{
+							// TODO figure out how to best get current list of registered users
+							// nib list message or read config file? not sure 
+							return true;
+						}
+						else
+						{
+							int n = msisdn.length();
+
+							// declaring character array
+							char char_array[n+1];
+							strcpy(char_array, msisdn.c_str());
+							int c = countChars(char_array, ',');
+							c++;
+							msg.retValue() << "Messaging " << c << " number(s) \r\n";
+							// Iterare
+							char *pt;
+							pt = strtok (char_array,",");
+							while (pt != NULL) {
+								msg.retValue() << "sending ---->" << pt << "\r\n";
+
+								String caller;
+								tmp.startSkip(msisdn);
+								tmp = tmp.trimBlanks();
+								s = tmp.find(' ');
+								if (s >= 0) {
+									caller = tmp.substr(0, s);
+									// Sending text message
+									if (SmsSendPlugin::sendSMS(pt, caller, tmp.substr(s + 1)) == true) {
+										msg.retValue() << "message succesfuly sent.\r\n";
+									}
+									else
+										msg.retValue() << "failed to send message.\r\n";
+									}
+									pt = strtok (NULL, ",");
+								}
+
 							}
-							else
-								msg.retValue() << "failed to send message.\r\n";
+							return true;
 						}
 					}
-				}
-				break;
+					break;
 			case Help:
 				tmp = msg.getValue(YSTRING("line"));
 				if (tmp.null() || (tmp == YSTRING("smssend"))) {
@@ -168,7 +240,6 @@ namespace {
 	SmsSendPlugin::~SmsSendPlugin() {
 		Output("Unloading module Sms Sender.");
 	}
-
 	void SmsSendPlugin::initialize() {
 
 		Output("Initializing module Sms Sender");

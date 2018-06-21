@@ -7,7 +7,7 @@
 NAME	= smssend.yate
 INSTALL = /usr/local/lib/yate/$(NAME)
 
-CC		= g++
+CC		= g++-6
 RM		= rm -f
 LN		= ln -s
 CP		= cp
